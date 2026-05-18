@@ -1,6 +1,6 @@
 # ATP Tennis Match Analysis (2010–2024)
 
-A statistical data science project analyzing resilience in professional men's tennis using 15 years of ATP match data. Four hypothesis-driven regression models test how clutch performance, physical recovery, surface specialization, and fatigue interact to determine match outcomes.
+A data science project analyzing resilience in professional men's tennis using 15 years of ATP match data. I built four regression models to test how clutch performance, physical recovery, surface specialization, and fatigue interact to predict match outcomes.
 
 **Author:** Akinwale Agesin  
 **Data source:** [Jeff Sackmann's ATP Repository](https://github.com/JeffSackmann/tennis_atp)
@@ -9,10 +9,10 @@ A statistical data science project analyzing resilience in professional men's te
 
 ## Research Questions
 
-1. **Short-term resilience:** Does clutch performance (break-point save rate) predict match outcomes, controlling for player rank?
-2. **Long-term resilience:** After a fatiguing match, do players who serve above their seasonal average win more often?
-3. **Surface specialization:** Does playing on a preferred surface help players overcome ranking disadvantages?
-4. **Fatigue & clutch interaction:** Do longer previous matches predict worse break-point performance?
+1. Does clutch performance (break-point save rate) actually predict who wins, once you control for ranking?
+2. After a physically draining match, do players who serve better than their usual baseline win more in their next match?
+3. Does playing on your best surface help you beat higher-ranked opponents?
+4. Does a long previous match make players worse under pressure in their next one?
 
 ---
 
@@ -20,8 +20,8 @@ A statistical data science project analyzing resilience in professional men's te
 
 ```
 atp-tennis-analysis/
-├── data_pipeline.ipynb        # Part 1: Data collection, cleaning, feature engineering, EDA
-├── analysis.ipynb             # Part 2: Hypothesis testing, regression models, results
+├── data_pipeline.ipynb        # Data collection, cleaning, feature engineering, EDA
+├── analysis.ipynb             # Hypothesis testing, regression models, results
 ├── players_df.csv             # Player-match level dataset (output of data_pipeline.ipynb)
 ├── analysis_df.csv            # Regression-ready dataset (output of data_pipeline.ipynb)
 ├── requirements.txt
@@ -29,99 +29,82 @@ atp-tennis-analysis/
 └── README.md
 ```
 
-### Notebook Pipeline
-
-```
-data_pipeline.ipynb
-      │
-      │  produces
-      ▼
-players_df.csv ──────────┐
-analysis_df.csv ─────────┴──▶  analysis.ipynb
-                                (4 regression models,
-                                 hypothesis testing,
-                                 visualizations)
-```
-
-Run `data_pipeline.ipynb` first to generate the `.csv` files, then run `analysis.ipynb`.
+Run `data_pipeline.ipynb` first to generate the CSVs, then open `analysis.ipynb`.
 
 ---
 
-## Hypotheses & Models
+## Models & Findings
 
-### H1 — Clutch Performance → Win Probability
-**Model:** Logistic regression  
-`logit(P(win)) = β₀ + β₁·clutch + β₂·rank`
+### H1 — Does clutch performance predict wins?
+**Model:** Logistic regression — `logit(P(win)) = β₀ + β₁·clutch + β₂·rank`
 
-**Finding:** Clutch is a strong, statistically significant predictor (β=0.954, p<0.001). A 0.1 increase in the clutch index raises the odds of winning by ~10%.
+Yes, pretty clearly. The clutch coefficient came out at 0.954 (p<0.001), meaning a 0.1 increase in the clutch index raises your odds of winning by about 10%. Rank still matters, but clutch adds real predictive power on top of it.
 
 ---
 
-### H2 — Recovery Serving Performance → Next Match Win
-**Model:** Logistic regression on fatigue-flagged matches (top 25% by duration)  
+### H2 — Does serving well after a tough match predict winning the next one?
+**Model:** Logistic regression on the top 25% of matches by duration  
 `logit(P(next_win)) = β₀ + β₁·next_FS_pct_diff`
 
-**Finding:** Serving above one's seasonal average after a fatiguing match is significantly associated with winning the recovery match (β=2.893, p<0.001). A 10pp serving improvement raises win odds by ~34%.
+Also yes. Serving above your seasonal average after a fatiguing match is strongly associated with winning that recovery match (β=2.893, p<0.001). A 10 percentage point serving improvement roughly translates to 34% better odds of winning.
 
 ---
 
-### H3 — Surface Specialization → Win Probability (with rank interaction)
-**Model:** Logistic regression with interaction term  
+### H3 — Does surface specialization help you pull upsets?
+**Model:** Logistic regression with interaction  
 `logit(P(win)) = β₀ + β₁·rank_diff + β₂·surface_experience + β₃·(rank_diff × surface_experience)`
 
-**Finding:** Surface experience has a strong positive effect (β=0.221, p<0.001). The negative interaction term (β=-0.006) shows specialization does not amplify upsets — specialists win consistently regardless of ranking gap.
+Surface experience has a strong positive effect (β=0.221, p<0.001), but the interaction term (β=-0.006) tells an interesting story — specialists don't actually win more upsets than expected. They just win consistently across all matchups, regardless of the ranking gap.
 
 ---
 
-### H4 — Fatigue (Previous Match Duration) → Clutch Performance
-**Model:** OLS regression with surface fixed effects  
+### H4 — Does a long previous match hurt clutch performance?
+**Model:** OLS with surface fixed effects  
 `clutch = β₀ + β₁·prev_minutes + β₂·rank + β₃·C(surface)`
 
-**Finding:** Null hypothesis not rejected. `prev_minutes` coefficient is near zero and non-significant (p=0.093). No evidence that physical fatigue from a prior match degrades clutch performance.
+No evidence of this. The `prev_minutes` coefficient is basically zero and not significant (p=0.093). Physical fatigue from the previous match doesn't seem to affect break-point performance, at least not in a way this model can detect.
 
 ---
 
-## Engineered Features
+## Features I Engineered
 
-| Feature | Description |
+| Feature | What it captures |
 |---|---|
 | `clutch` | Break points saved / break points faced per match |
 | `FS_pct` | First serves in / total first serves attempted |
-| `FS_pct_avg` | Player's average `FS_pct` across a full season |
-| `FS_pct_diff` | Match `FS_pct` minus seasonal average (above/below baseline) |
-| `next_FS_pct_diff` | `FS_pct_diff` in the player's next match |
-| `prev_minutes` | Duration of the player's immediately preceding match |
-| `surface_experience` | Proportion of career matches played on the current surface |
-| `rank_diff` | Loser rank minus winner rank (match-level ranking gap) |
+| `FS_pct_avg` | Player's average first serve % across a full season |
+| `FS_pct_diff` | Match first serve % minus seasonal average |
+| `next_FS_pct_diff` | Same metric, but for the player's next match |
+| `prev_minutes` | Duration of the immediately preceding match |
+| `surface_experience` | Share of career matches played on current surface |
+| `rank_diff` | Loser rank minus winner rank (size of the ranking gap) |
 
 ---
 
-## Results Summary
+## Results at a Glance
 
-| Hypothesis | Predictor | Effect | Significant? |
+| Hypothesis | Predictor | Direction | Significant? |
 |---|---|---|---|
-| H1 | Clutch index | ↑ Win probability | ✅ Yes |
-| H2 | Recovery serving above average | ↑ Next win probability | ✅ Yes |
-| H3 | Surface experience | ↑ Win probability | ✅ Yes |
-| H3 (interaction) | Surface × rank gap | Dampens rank effect | ✅ Yes |
-| H4 | Previous match duration | No effect on clutch | ❌ No |
+| H1 | Clutch index | Increases win probability | Yes |
+| H2 | Recovery serving above average | Increases next win probability | Yes |
+| H3 | Surface experience | Increases win probability | Yes |
+| H3 (interaction) | Surface x rank gap | Dampens rank advantage | Yes |
+| H4 | Previous match duration | No effect on clutch | No |
 
 ---
 
-## Setup & Usage
+## Setup
 
 ```bash
 pip install -r requirements.txt
 jupyter notebook
 ```
 
-Open and run `data_pipeline.ipynb` first, then `analysis.ipynb`.
-
-No data download required — `data_pipeline.ipynb` pulls directly from Jeff Sackmann's public GitHub repository at runtime.
+No data download needed — `data_pipeline.ipynb` pulls directly from Jeff Sackmann's public GitHub at runtime.
 
 ---
 
-## Requirements
+## Dependencies
 
 ```
 pandas
@@ -136,19 +119,9 @@ jupyter
 
 ---
 
-## Limitations
+## Limitations Worth Noting
 
-- Match statistics (duration, break points) are consistently available only from ~2010 onward
-- Data is aggregate match-level only — no point-by-point context (score state, weather, crowd)
-- Clutch index is noisy for matches with few break points (extreme values of 0 or 1 are common artifacts)
-- Sequential match analysis (H2, H4) relies on within-year continuity
-
----
-
-## Skills Demonstrated
-
-- **End-to-end data pipeline** — raw sports archive → engineered feature store → statistical models
-- **Feature engineering** — domain-meaningful metrics from raw event data
-- **Statistical inference** — logistic and OLS regression with preregistered hypotheses, confidence intervals, AUC, and residual diagnostics
-- **Interaction modeling** — testing whether the effect of one variable changes as a function of another
-- **Responsible AI alignment** — model scope documentation, extrapolation boundaries, and data governance principles
+- Detailed match stats are only reliably available from around 2010 onward
+- Everything is match-level — no point-by-point data, so I can't account for score state, weather, or crowd effects
+- The clutch index gets noisy in short matches where a player faces very few break points (0s and 1s are common artifacts)
+- The sequential analysis in H2 and H4 depends on matches being played within the same season
